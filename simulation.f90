@@ -25,7 +25,6 @@ contains
     implicit none
     integer(kind=4), intent(in) :: fid
     integer(kind=4) :: IndexW, IndexS
-    read(fid, *) nSimulation
     allocate(simulations(nSimulation))
     do IndexW = 1, nSimulation
       read(fid, *) simulations(IndexW)%beta, simulations(IndexW)%nSnapshots
@@ -95,7 +94,7 @@ contains
       do IndexEbin = 1, NumEbin
         IndexB = IndexB + 1 
         do IndexW = 1, nSimulation
-          simulations(IndexW)%bins(IndexB)%energyBiasing = reactCoordBin(IndexRCbin)%energyBiasing
+          simulations(IndexW)%bins(IndexB)%energyBiasing = reactCoordBin(IndexRCbin,IndexW)%energyBiasing
           simulations(IndexW)%bins(IndexB)%energy = energy(IndexEbin)
           simulations(IndexW)%bins(IndexB)%energyWidth = deltaE
           simulations(IndexW)%bins(IndexB)%biasingFactor = &

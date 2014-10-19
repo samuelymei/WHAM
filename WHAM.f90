@@ -15,9 +15,9 @@ module WHAM
   implicit none
   
   private
-
-  integer(kind=4), public :: NumJ = 50  ! number of reaction coordinate bins
-  integer(kind=4), public :: NumK = 100 ! number of energy bins
+  integer(kind=4), public :: NumW  ! number of simulations
+  integer(kind=4), public :: NumJ  ! number of reaction coordinate bins
+  integer(kind=4), public :: NumK  ! number of energy bins
   integer(kind=4), public :: NumB 
   real(kind=fp_kind), parameter :: TOLERANCE = 1.0e-5 ! convergence criterion for free energy 
   integer(kind=4), parameter :: MaxITS = 1000  ! max number of iterations
@@ -42,12 +42,12 @@ contains
     real(kind=fp_kind) :: freeenergyMin
     real(kind=fp_kind) :: freeenergyRMSD
     real(kind=fp_kind) :: freeenergyOld(nSimulation)
+    integer(kind=4) :: iIteration
     logical :: converged
 
     simulations(:)%freeenergy = 1.d0   ! assign an initial guess of the free energy
     converged = .false.
-
-    do while (.not. converged)
+    do iIteration = 1, MAXITS
       freeenergyOld = simulations(:)%freeenergy
       do IndexB = 1, NumB
         numerator(IndexB) = 0.d0
@@ -82,13 +82,16 @@ contains
       end do
       freeenergyRMSD = sqrt(freeenergyRMSD/IndexW)
       if( freeenergyRMSD < TOLERANCE ) converged = .true.
+      if( converged ) exit
     end do
   end subroutine iteration
 
   subroutine startWHAM(fid)
     implicit none
     integer(kind=4), intent(in) :: fid
-    call readReactCoordBinInfo(fid, NumJ)
+    read(fid,*)NumW, NumJ, NumK, T_target
+    call readReactCoordBinInfo(fid, NumW, NumJ)
+    nSimulation = NumW
     call readSimulationInfo(fid)
     call initBins(NumJ, NumK, NumB, T_target)
     call iteration

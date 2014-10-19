@@ -5,14 +5,17 @@ module react_coord_bin
   type :: reactCoordBin_info
     real(kind=fp_kind) :: energyBiasing
   end type reactCoordBin_info
-  type ( reactCoordBin_info ), allocatable, public :: reactCoordBin(:)
+  type ( reactCoordBin_info ), allocatable, public :: reactCoordBin(:, :)
   public :: readReactCoordBinInfo, deleteReactCoordBinInfo
 contains
-  subroutine readReactCoordBinInfo( fid, NumJ )
+  subroutine readReactCoordBinInfo( fid, NumW, NumJ )
     implicit none
-    integer(kind=4), intent(in) :: fid, NumJ
-    allocate(reactCoordBin(NumJ))
-    read(fid,*)reactCoordBin(:)%energyBiasing
+    integer(kind=4), intent(in) :: fid, NumW, NumJ
+    integer(kind=4) :: IndexW
+    allocate(reactCoordBin(NumJ, NumW))
+    do IndexW = 1, NumW
+      read(fid,*)reactCoordBin(:, IndexW)%energyBiasing
+    end do
   end subroutine readReactCoordBinInfo
 
   subroutine deleteReactCoordBinInfo
