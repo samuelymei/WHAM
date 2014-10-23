@@ -19,22 +19,22 @@ module WHAM
   integer(kind=4), public :: NumJ  ! number of reaction coordinate bins
   integer(kind=4), public :: NumK  ! number of energy bins
   integer(kind=4), public :: NumB 
-  real(kind=fp_kind), parameter :: TOLERANCE = 1.0e-5 ! convergence criterion for free energy 
+  real(kind=fp_kind), parameter :: TOLERANCE = 1.0e-6 ! convergence criterion for free energy 
   integer(kind=4), parameter :: MaxITS = 1000  ! max number of iterations
   real(kind=fp_kind), public :: T_target = 300 ! target temperature
 
   real(kind=fp_kind) :: beta ! inverse temperature
 
-  integer(kind=4) :: IndexW ! index of windows/simulations
-  integer(kind=4) :: IndexS ! index of snapshot
-  integer(kind=4) :: IndexK ! index of energy bin
-  integer(kind=4) :: IndexJ ! index of reaction coordinate bin
+  integer(kind=4) :: indexW ! index of windows/simulations
+  integer(kind=4) :: indexS ! index of snapshot
+  integer(kind=4) :: indexK ! index of energy bin
+  integer(kind=4) :: indexJ ! index of reaction coordinate bin
 
-  integer(kind=4) :: IndexB ! index of combined Bin
+  integer(kind=4) :: indexB ! index of combined Bin
 
   real(kind=fp_kind), allocatable :: unbiasedDensity(:)
   
-  public :: startWHAM
+  public :: startWHAM, finalizeWHAM
 contains
   subroutine iteration
     implicit none
@@ -45,30 +45,31 @@ contains
     integer(kind=4) :: iIteration
     logical :: converged
 
+    allocate(unbiasedDensity(NumB))
     simulations(:)%freeenergy = 1.d0   ! assign an initial guess of the free energy
     converged = .false.
     do iIteration = 1, MAXITS
       freeenergyOld = simulations(:)%freeenergy
-      do IndexB = 1, NumB
-        numerator(IndexB) = 0.d0
-        do IndexW = 1, nSimulation
-          numerator(IndexB) = numerator(IndexB) + & 
-             & simulations(IndexW)%bins(IndexB)%histogram
+      do indexB = 1, NumB
+        numerator(indexB) = 0.d0
+        do indexW = 1, nSimulation
+          numerator(indexB) = numerator(indexB) + & 
+             & simulations(indexW)%bins(indexB)%histogram
         end do
-        denominator(IndexB) = 0.d0
-        do IndexW = 1, nSimulation
-          denominator(IndexB) = denominator(IndexB) + &
-             & simulations(IndexW)%nEffectivenSnapshots * simulations(IndexW)%freeenergy * &
-             & simulations(IndexW)%bins(IndexB)%biasingFactor
+        denominator(indexB) = 0.d0
+        do indexW = 1, nSimulation
+          denominator(indexB) = denominator(indexB) + &
+             & simulations(indexW)%nEffectivenSnapshots * simulations(indexW)%freeenergy * &
+             & simulations(indexW)%bins(indexB)%biasingFactor
         end do
       end do
       unbiasedDensity = numerator / denominator
  
       simulations(:)%freeenergy = 0.d0
-      do IndexW = 1, nSimulation
-        do IndexB = 1, NumB
-          simulations(IndexW)%freeenergy = simulations(IndexW)%freeenergy + &
-            & simulations(IndexW)%bins(IndexB)%biasingFactor * unbiasedDensity(IndexB)
+      do indexW = 1, nSimulation
+        do indexB = 1, NumB
+          simulations(indexW)%freeenergy = simulations(indexW)%freeenergy + &
+            & simulations(indexW)%bins(indexB)%biasingFactor * unbiasedDensity(indexB)
         end do    
       end do
       freeenergyMin = minval(simulations(:)%freeenergy) - 1
@@ -76,13 +77,16 @@ contains
       simulations(:)%freeenergy = 1.d0/ simulations(:)%freeenergy
 
       freeenergyRMSD =0.d0
-      do IndexW = 1, nSimulation
+      do indexW = 1, nSimulation
         freeenergyRMSD = freeenergyRMSD + & 
-          & (simulations(IndexW)%freeenergy - freeenergyOld(IndexW))**2
+          & (simulations(indexW)%freeenergy - freeenergyOld(indexW))**2
       end do
-      freeenergyRMSD = sqrt(freeenergyRMSD/IndexW)
+      freeenergyRMSD = sqrt(freeenergyRMSD/indexW)
+      write(6,'(A,1X,I4,A,E12.4)')'Iteration ', iIteration, ': RMSD of dimensionless free energy:', freeenergyRMSD
       if( freeenergyRMSD < TOLERANCE ) converged = .true.
-      if( converged ) exit
+      if( converged ) then
+        exit
+      end if
     end do
   end subroutine iteration
 
@@ -90,12 +94,25 @@ contains
     implicit none
     integer(kind=4), intent(in) :: fid
     read(fid,*)NumW, NumJ, NumK, T_target
+    write(6,*)'Number of simulations:', NumW
+    write(6,*)'Number of reaction coordinate bins:', NumJ
+    write(6,*)'Number of Energy bins:', NumK
+    write(6,*)'Target temperature:', T_target
+    print*,'call readReactCoordBinInfo'
     call readReactCoordBinInfo(fid, NumW, NumJ)
     nSimulation = NumW
+    print*,'call readSimulationInfo'
     call readSimulationInfo(fid)
+    print*,'call initBins'
     call initBins(NumJ, NumK, NumB, T_target)
+    print*,'iteration'
     call iteration
+  end subroutine startWHAM
+
+  subroutine finalizeWHAM
+    implicit none
+    deallocate(unbiasedDensity)
     call deleteReactCoordBinInfo
     call deleteSimulationInfo
-  end subroutine startWHAM
+  end subroutine finalizeWHAM
 end module WHAM

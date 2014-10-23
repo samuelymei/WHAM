@@ -11,6 +11,7 @@ module simulation
     integer(kind=4) :: nSnapshots ! Number of snapshots in this simulation
     integer(kind=4) :: nEffectivenSnapshots ! snapshots outside the RC bins are removed
     real(kind=fp_kind) :: freeEnergy
+    real(kind=fp_kind) :: energyBinWidth
     type ( snapshot_info ), pointer :: snapshots(:) ! point to the snapshots
     type ( bin_info ), pointer :: bins(:)
   end type simulation_info
@@ -24,14 +25,16 @@ contains
     use constant
     implicit none
     integer(kind=4), intent(in) :: fid
-    integer(kind=4) :: IndexW, IndexS
+    integer(kind=4) :: indexW, indexS
     allocate(simulations(nSimulation))
-    do IndexW = 1, nSimulation
-      read(fid, *) simulations(IndexW)%beta, simulations(IndexW)%nSnapshots
-      allocate(simulations(IndexW)%snapshots(simulations(IndexW)%nSnapshots))
-      do IndexS = 1, simulations(IndexW)%nSnapshots
-        read(fid,*) simulations(IndexW)%snapshots(IndexS)%jReactCoordBin, & 
-                  & simulations(IndexW)%snapshots(IndexS)%energyUnbiased
+    do indexW = 1, nSimulation
+      read(fid, *) simulations(indexW)%beta, simulations(indexW)%nSnapshots
+      write(6,'(A,I3,A,F10.6,A,I10)') ' Simulation ', indexW, ': beta = ', simulations(indexW)%beta, &
+         & ', Number of snapshots:', simulations(indexW)%nSnapshots
+      allocate(simulations(indexW)%snapshots(simulations(indexW)%nSnapshots))
+      do indexS = 1, simulations(indexW)%nSnapshots
+        read(fid,*) simulations(indexW)%snapshots(indexS)%jReactCoordBin, & 
+                  & simulations(indexW)%snapshots(indexS)%energyUnbiased
       end do
     end do
     call energyMinMax
@@ -39,24 +42,24 @@ contains
 
   subroutine deleteSimulationInfo
     implicit none
-    integer(kind=4) :: IndexW
-    do IndexW = 1, nSimulation
-      deallocate(simulations(IndexW)%snapshots)
+    integer(kind=4) :: indexW
+    do indexW = 1, nSimulation
+      deallocate(simulations(indexW)%snapshots)
     end do
     if(allocated(simulations))deallocate(simulations)
   end subroutine deleteSimulationInfo
 
   subroutine energyMinMax
     implicit none
-    integer(kind=4) :: IndexW, IndexS
+    integer(kind=4) :: indexW, indexS
     energyMin = simulations(1)%snapshots(1)%energyUnbiased
     energyMax = simulations(1)%snapshots(1)%energyUnbiased
-    do IndexW = 1, nSimulation
-      do IndexS = 1, simulations(IndexW)%nSnapshots
-        if(simulations(IndexW)%snapshots(IndexS)%energyUnbiased < energyMin) & 
-           & energyMin = simulations(IndexW)%snapshots(IndexS)%energyUnbiased
-        if(simulations(IndexW)%snapshots(IndexS)%energyUnbiased > energyMax) & 
-           & energyMax = simulations(IndexW)%snapshots(IndexS)%energyUnbiased
+    do indexW = 1, nSimulation
+      do indexS = 1, simulations(indexW)%nSnapshots
+        if(simulations(indexW)%snapshots(indexS)%energyUnbiased < energyMin) & 
+           & energyMin = simulations(indexW)%snapshots(indexS)%energyUnbiased
+        if(simulations(indexW)%snapshots(indexS)%energyUnbiased > energyMax) & 
+           & energyMax = simulations(indexW)%snapshots(indexS)%energyUnbiased
       end do
     end do
   end subroutine energyMinMax
@@ -70,64 +73,73 @@ contains
 
     real(kind=fp_kind) :: energy(NumEbin)
     real(kind=fp_kind) :: deltaRC, deltaE
-    integer(kind=4) :: IndexRCbin, IndexEbin
+    integer(kind=4) :: indexRCbin, indexEbin
     real(kind=fp_kind) :: DELTA 
-    integer(kind=4) :: IndexW, IndexB
+    integer(kind=4) :: indexW, indexB
     real(kind=fp_kind) :: beta_target
     real(kind=fp_kind) :: beta
     real(kind=fp_kind) :: biasingPotential
 
     DELTA = (energyMax - energyMin)/(100*NumEbin)
     deltaE = (energyMax - energyMin + DELTA)/NumEbin
-    do IndexEbin = 1, NumEbin
-      energy(IndexEbin) = energyMin + deltaE * (IndexEbin-0.5)
+    do indexEbin = 1, NumEbin
+      energy(indexEbin) = energyMin + deltaE * (indexEbin-0.5)
     end do
 
     NumBin = NumRCbin * NumEbin
-    do IndexW = 1, nSimulation
-      allocate(simulations(IndexW)%bins(NumBin))
+    print*,'****', NumRCbin, NumEbin, NumBin,nSimulation
+    do indexW = 1, nSimulation
+      allocate(simulations(indexW)%bins(NumBin))
     end do
 
     beta_target = 1.d0 / (kB*T_target)
-    IndexB = 0
-    do IndexRCbin = 1, NumRCbin
-      do IndexEbin = 1, NumEbin
-        IndexB = IndexB + 1 
-        do IndexW = 1, nSimulation
-          simulations(IndexW)%bins(IndexB)%energyBiasing = reactCoordBin(IndexRCbin,IndexW)%energyBiasing
-          simulations(IndexW)%bins(IndexB)%energy = energy(IndexEbin)
-          simulations(IndexW)%bins(IndexB)%energyWidth = deltaE
-          simulations(IndexW)%bins(IndexB)%biasingFactor = &
-            & exp(-(simulations(IndexW)%beta-beta_target)*simulations(IndexW)%bins(IndexB)%energy) * &
-            & exp(-simulations(IndexW)%beta*simulations(IndexW)%bins(IndexB)%energyBiasing)
-          simulations(IndexW)%bins(IndexB)%jReactCoord = IndexRCbin
-          simulations(IndexW)%bins(IndexB)%kEnergy = IndexEbin
+
+    do indexW = 1, nSimulation
+       simulations(indexW)%energybinWidth = deltaE
+    end do
+
+    indexB = 0
+    do indexRCbin = 1, NumRCbin
+      do indexEbin = 1, NumEbin
+        indexB = indexB + 1 
+        do indexW = 1, nSimulation
+          simulations(indexW)%bins(indexB)%energyBiasing = reactCoordBin(indexRCbin,indexW)%energyBiasing
+          simulations(indexW)%bins(indexB)%energy = energy(indexEbin)
+          simulations(indexW)%bins(indexB)%biasingFactor = &
+            & exp(-(simulations(indexW)%beta-beta_target)*simulations(indexW)%bins(indexB)%energy) * &
+            & exp(-simulations(indexW)%beta*simulations(indexW)%bins(indexB)%energyBiasing)
+          simulations(indexW)%bins(indexB)%jReactCoord = indexRCbin
+          simulations(indexW)%bins(indexB)%kEnergy = indexEbin
         end do
       end do
     end do
-    call buildHistogram(NumRCbin, NumEbin)
+    print*,'call buildHistogram'
+    call buildHistogram(NumRCbin, NumEbin, NumBin)
   end subroutine initBins
 
-  subroutine buildHistogram(NumRCbin, NumEbin)
+  subroutine buildHistogram(NumRCbin, NumEbin, NumBin)
     implicit none
-    integer(kind=4), intent(in) :: NumRCbin, NumEbin
-    integer(kind=4) :: IndexW, IndexB, IndexS
-    integer(kind=4) :: IndexRCbin, IndexEbin
-    do IndexW = 1, nSimulation
-      simulations(IndexW)%bins(:)%histogram = 0
-      do IndexS = 1, simulations(IndexW)%nSnapshots
-        if(simulations(IndexW)%snapshots(IndexS)%jReactCoordBin < 0 .or. &
-         & simulations(IndexW)%snapshots(IndexS)%jReactCoordBin > NumRCbin ) cycle
-        IndexEbin = ( simulations(IndexW)%snapshots(IndexS)%energyUnbiased - &
-                     & simulations(IndexW)%bins(IndexB)%energy + &
-                     & simulations(IndexW)%bins(IndexB)%energyWidth / 2.d0 ) &
-                   & /simulations(IndexW)%bins(IndexB)%energyWidth + 1
+    integer(kind=4), intent(in) :: NumRCbin, NumEbin, NumBin
+    integer(kind=4) :: indexW, indexB, indexS
+    integer(kind=4) :: indexRCbin, indexEbin
+    do indexW = 1, nSimulation
+      simulations(indexW)%bins(:)%histogram = 0
+      do indexS = 1, simulations(indexW)%nSnapshots
+        if(simulations(indexW)%snapshots(indexS)%jReactCoordBin < 0 .or. &
+         & simulations(indexW)%snapshots(indexS)%jReactCoordBin > NumRCbin ) cycle
 
-        IndexB = ( IndexRCbin - 1 ) * NumEbin + IndexEbin
-        simulations(IndexW)%bins(IndexB)%histogram = &
-                   & simulations(IndexW)%bins(IndexB)%histogram + 1
+        indexEbin = ( simulations(indexW)%snapshots(indexS)%energyUnbiased - &
+                     & (simulations(indexW)%bins(1)%energy - &
+                     &  simulations(indexW)%energyBinWidth / 2.d0 ) ) &
+                   & /simulations(indexW)%energyBinWidth + 1
+
+        indexB = ( simulations(indexW)%snapshots(indexS)%jReactCoordBin - 1 ) * NumEbin + indexEbin
+        simulations(indexW)%bins(indexB)%histogram = &
+                   & simulations(indexW)%bins(indexB)%histogram + 1
       end do
-      simulations(IndexW)%nEffectivenSnapshots = sum(simulations(IndexW)%bins(:)%histogram)
+      simulations(indexW)%nEffectivenSnapshots = sum(simulations(indexW)%bins(:)%histogram)
+      write(6,'(A,I4,A,I10)')'Effective number of snapshots in simulation', indexW, ':', &
+        & simulations(indexW)%nEffectivenSnapshots
     end do
   end subroutine buildHistogram
 

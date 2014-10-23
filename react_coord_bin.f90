@@ -11,11 +11,9 @@ contains
   subroutine readReactCoordBinInfo( fid, NumW, NumJ )
     implicit none
     integer(kind=4), intent(in) :: fid, NumW, NumJ
-    integer(kind=4) :: IndexW
+    integer(kind=4) :: indexW
     allocate(reactCoordBin(NumJ, NumW))
-    do IndexW = 1, NumW
-      read(fid,*)reactCoordBin(:, IndexW)%energyBiasing
-    end do
+    read(fid,*)(reactCoordBin(:, indexW)%energyBiasing, indexW = 1, NumW)
   end subroutine readReactCoordBinInfo
 
   subroutine deleteReactCoordBinInfo
