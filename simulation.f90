@@ -28,7 +28,7 @@ contains
     allocate(simulations(nSimulation))
     do indexW = 1, nSimulation
       read(fid, *) simulations(indexW)%beta, simulations(indexW)%nSnapshots
-      write(6,'(A,I3,A,F10.6,A,I10)') ' Simulation ', indexW, ': beta = ', simulations(indexW)%beta, &
+      write(6,'(A,I3,A,F10.6,A,I10)') ' Simulation ', indexW, ':    beta = ', simulations(indexW)%beta, &
          & ', Number of snapshots:', simulations(indexW)%nSnapshots
       allocate(simulations(indexW)%snapshots(simulations(indexW)%nSnapshots))
       do indexS = 1, simulations(indexW)%nSnapshots
@@ -61,6 +61,7 @@ contains
            & energyMax = simulations(indexW)%snapshots(indexS)%energyUnbiased
       end do
     end do
+    write(6,'(A,G12.3,A,G12.3)')'Energy range: ', energyMin, '~', energyMax
   end subroutine energyMinMax
 
   subroutine initBins(NumRCbin, NumEbin, NumBin, T_target)
@@ -86,13 +87,14 @@ contains
     end do
 
     NumBin = NumRCbin * NumEbin
-    print*,'****', NumRCbin, NumEbin, NumBin,nSimulation
+    write(6,*)'     NumRCbin      NumEbin      NumBin     nSimulation '
+    write(6,*)NumRCbin, NumEbin, NumBin, nSimulation
     do indexW = 1, nSimulation
       allocate(simulations(indexW)%bins(NumBin))
     end do
 
     beta_target = 1.d0 / (kB*T_target)
-
+    write(6,*) 'Beta of the target temperature:', beta_target
     indexB = 0
     do indexRCbin = 1, NumRCbin
       do indexEbin = 1, NumEbin
@@ -126,15 +128,19 @@ contains
         if(simulations(indexW)%snapshots(indexS)%jReactCoordBin < 0 .or. &
          & simulations(indexW)%snapshots(indexS)%jReactCoordBin > NumRCbin ) cycle
 
-        indexEbin = -999
-        do iTemp = 1, NumEbin
-          if ( abs( simulations(indexW)%snapshots(indexS)%energyUnbiased - &
-                  & simulations(indexW)%bins(iTemp)%energy ) <= &
-                     simulations(indexW)%bins(iTemp)%energyBinWidth / 2.d0 ) then
-            indexEbin = iTemp
-            cycle
-          end if
-        end do
+        if(NumEbin == 1) then  ! NOT T-WHAM
+          indexEbin = 1
+        else
+          indexEbin = -999
+          do iTemp = 1, NumEbin
+            if ( abs( simulations(indexW)%snapshots(indexS)%energyUnbiased - &
+                    & simulations(indexW)%bins(iTemp)%energy ) <= &
+                      simulations(indexW)%bins(iTemp)%energyBinWidth / 2.d0 ) then
+              indexEbin = iTemp
+              cycle
+            end if
+          end do
+        end if
 
         indexRCbin = simulations(indexW)%snapshots(indexS)%jReactCoordBin
         if(isInRange(indexEbin,1,NumEbin) .and. isInRange(indexRCbin,1,NumRCbin)) then

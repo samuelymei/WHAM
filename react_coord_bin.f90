@@ -13,7 +13,10 @@ contains
     integer(kind=4), intent(in) :: fid, NumW, NumJ
     integer(kind=4) :: indexW
     allocate(reactCoordBin(NumJ, NumW))
-    read(fid,*)(reactCoordBin(:, indexW)%energyBiasing, indexW = 1, NumW)
+!    read(fid,*)(reactCoordBin(:, indexW)%energyBiasing, indexW = 1, NumW)
+    do indexW = 1, NumW
+      read(fid,*)reactCoordBin(:, indexW)%energyBiasing
+    end do
   end subroutine readReactCoordBinInfo
 
   subroutine deleteReactCoordBinInfo
