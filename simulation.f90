@@ -11,7 +11,6 @@ module simulation
     integer(kind=4) :: nSnapshots ! Number of snapshots in this simulation
     integer(kind=4) :: nEffectivenSnapshots ! snapshots outside the RC bins are removed
     real(kind=fp_kind) :: freeEnergy
-    real(kind=fp_kind) :: energyBinWidth
     type ( snapshot_info ), pointer :: snapshots(:) ! point to the snapshots
     type ( bin_info ), pointer :: bins(:)
   end type simulation_info
@@ -94,10 +93,6 @@ contains
 
     beta_target = 1.d0 / (kB*T_target)
 
-    do indexW = 1, nSimulation
-       simulations(indexW)%energybinWidth = deltaE
-    end do
-
     indexB = 0
     do indexRCbin = 1, NumRCbin
       do indexEbin = 1, NumEbin
@@ -105,6 +100,7 @@ contains
         do indexW = 1, nSimulation
           simulations(indexW)%bins(indexB)%energyBiasing = reactCoordBin(indexRCbin,indexW)%energyBiasing
           simulations(indexW)%bins(indexB)%energy = energy(indexEbin)
+          simulations(indexW)%bins(indexB)%energyBinWidth = deltaE
           simulations(indexW)%bins(indexB)%biasingFactor = &
             & exp(-(simulations(indexW)%beta-beta_target)*simulations(indexW)%bins(indexB)%energy) * &
             & exp(-simulations(indexW)%beta*simulations(indexW)%bins(indexB)%energyBiasing)
@@ -122,20 +118,30 @@ contains
     integer(kind=4), intent(in) :: NumRCbin, NumEbin, NumBin
     integer(kind=4) :: indexW, indexB, indexS
     integer(kind=4) :: indexRCbin, indexEbin
+    integer(kind=4) :: iTemp
+    logical :: isInRange
     do indexW = 1, nSimulation
       simulations(indexW)%bins(:)%histogram = 0
       do indexS = 1, simulations(indexW)%nSnapshots
         if(simulations(indexW)%snapshots(indexS)%jReactCoordBin < 0 .or. &
          & simulations(indexW)%snapshots(indexS)%jReactCoordBin > NumRCbin ) cycle
 
-        indexEbin = ( simulations(indexW)%snapshots(indexS)%energyUnbiased - &
-                     & (simulations(indexW)%bins(1)%energy - &
-                     &  simulations(indexW)%energyBinWidth / 2.d0 ) ) &
-                   & /simulations(indexW)%energyBinWidth + 1
+        indexEbin = -999
+        do iTemp = 1, NumEbin
+          if ( abs( simulations(indexW)%snapshots(indexS)%energyUnbiased - &
+                  & simulations(indexW)%bins(iTemp)%energy ) <= &
+                     simulations(indexW)%bins(iTemp)%energyBinWidth / 2.d0 ) then
+            indexEbin = iTemp
+            cycle
+          end if
+        end do
 
-        indexB = ( simulations(indexW)%snapshots(indexS)%jReactCoordBin - 1 ) * NumEbin + indexEbin
-        simulations(indexW)%bins(indexB)%histogram = &
-                   & simulations(indexW)%bins(indexB)%histogram + 1
+        indexRCbin = simulations(indexW)%snapshots(indexS)%jReactCoordBin
+        if(isInRange(indexEbin,1,NumEbin) .and. isInRange(indexRCbin,1,NumRCbin)) then
+          indexB = ( indexRCbin - 1 ) * NumEbin + indexEbin
+          simulations(indexW)%bins(indexB)%histogram = &
+                     & simulations(indexW)%bins(indexB)%histogram + 1
+        end if
       end do
       simulations(indexW)%nEffectivenSnapshots = sum(simulations(indexW)%bins(:)%histogram)
       write(6,'(A,I4,A,I10)')'Effective number of snapshots in simulation', indexW, ':', &

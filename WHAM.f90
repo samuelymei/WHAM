@@ -37,6 +37,7 @@ module WHAM
   public :: startWHAM, finalizeWHAM
 contains
   subroutine iteration
+    use constant, only : kB
     implicit none
     real(kind=fp_kind) :: numerator(NumB), denominator(NumB)
     real(kind=fp_kind) :: freeenergyMin
@@ -85,7 +86,11 @@ contains
       write(6,'(A,1X,I4,A,E12.4)')'Iteration ', iIteration, ': RMSD of dimensionless free energy:', freeenergyRMSD
       if( freeenergyRMSD < TOLERANCE ) converged = .true.
       if( converged ) then
+        write(99,'(F10.4)')-kB*T_target*log(unbiasedDensity)
         exit
+      end if
+      if ( iIteration == MAXITS ) then
+         write(6,*)'Convergence failure'
       end if
     end do
   end subroutine iteration
