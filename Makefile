@@ -10,7 +10,7 @@ EXE = WHAM.x
 
 MODULES = bin.mod constant.mod precision_m.mod react_coord_bin.mod simulation.mod snapshot.mod wham.mod
 
-OBJS = lib.o precision_m.o constant.o snapshot.o bin.o react_coord_bin.o simulation.o WHAM.o WHAM_caller.o
+OBJS = precision_m.o lib.o constant.o snapshot.o bin.o react_coord_bin.o simulation.o WHAM.o WHAM_caller.o
 
 all:	${EXE}
 

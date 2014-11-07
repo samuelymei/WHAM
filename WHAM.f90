@@ -19,9 +19,9 @@ module WHAM
   integer(kind=4), public :: NumJ  ! number of reaction coordinate bins
   integer(kind=4), public :: NumK  ! number of energy bins
   integer(kind=4), public :: NumB  ! number of bins
-  real(kind=fp_kind), parameter :: TOLERANCE = 1.0E-6  ! convergence criterion for free energy 
+  real(kind=fp_kind), parameter :: TOLERANCE = 1.0D-4  ! convergence criterion for free energy 
   integer(kind=4), parameter :: MaxITS = 1000          ! max number of iterations
-  real(kind=fp_kind), public :: T_target = 300.d0      ! target temperature
+  real(kind=fp_kind), public :: T_target = 3.0D2      ! target temperature
 
   real(kind=fp_kind) :: beta ! inverse temperature
 
@@ -43,7 +43,7 @@ contains
     write(6,'(A,I6)')'Number of simulations:', NumW
     write(6,'(A,I6)')'Number of reaction coordinate bins:', NumJ
     write(6,'(A,I6)')'Number of energy bins:', NumK
-    write(6,'(A,F10.2)')'Target temperature:', T_target
+    write(6,'(A,F10.3)')'Target temperature:', T_target
     print*,'call readReactCoordBinInfo'
     call readReactCoordBinInfo(fid, NumW, NumJ)
     nSimulation = NumW
@@ -57,7 +57,7 @@ contains
 
   subroutine finalizeWHAM
     implicit none
-    deallocate(unbiasedDensity)
+    if(allocated(unbiasedDensity))deallocate(unbiasedDensity)
     call deleteReactCoordBinInfo
     call deleteSimulationInfo
   end subroutine finalizeWHAM
@@ -70,25 +70,31 @@ contains
     real(kind=fp_kind) :: unbiasedDensityRMSD
     real(kind=fp_kind) :: unbiasedDensityOld(NumB)
     real(kind=fp_kind) :: sumOfUnbiasedDensity
+    real(kind=fp_kind) :: freeenergy(NumW)
     integer(kind=4) :: iIteration
     logical :: converged
-
+    real(kind=fp_kind) :: rmsd
+    real(kind=fp_kind) :: logUnbiasedDensity(NumB)
     allocate(unbiasedDensity(NumB))
-    simulations(:)%freeenergy = 1.d0   ! assign an initial guess of the free energy
+    freeenergy = 1.d0   ! assign an initial guess of the free energy
     unbiasedDensity = 1.d0/NumB
     converged = .false.
+
+    do indexB = 1, NumB
+      numerator(indexB) = 0.d0
+      do indexW = 1, nSimulation
+        numerator(indexB) = numerator(indexB) + & 
+           & simulations(indexW)%bins(indexB)%histogram
+      end do
+    end do
+
     do iIteration = 1, MAXITS
        unbiasedDensityOld = unbiasedDensity
       do indexB = 1, NumB
-        numerator(indexB) = 0.d0
-        do indexW = 1, nSimulation
-          numerator(indexB) = numerator(indexB) + & 
-             & simulations(indexW)%bins(indexB)%histogram
-        end do
         denominator(indexB) = 0.d0
         do indexW = 1, nSimulation
           denominator(indexB) = denominator(indexB) + &
-             & simulations(indexW)%nEffectivenSnapshots * simulations(indexW)%freeenergy * &
+             & simulations(indexW)%nEffectivenSnapshots * freeenergy(indexW) * &
              & simulations(indexW)%bins(indexB)%biasingFactor
         end do
       end do
@@ -97,32 +103,23 @@ contains
       sumOfUnbiasedDensity = sum(unbiasedDensity)
       unbiasedDensity = unbiasedDensity / sumOfUnbiasedDensity
 
-      simulations(:)%freeenergy = 0.d0
+      freeenergy = 0.d0
       do indexW = 1, nSimulation
         do indexB = 1, NumB
-          simulations(indexW)%freeenergy = simulations(indexW)%freeenergy + &
+          freeenergy(indexW) = freeenergy(indexW) + &
             & simulations(indexW)%bins(indexB)%biasingFactor * unbiasedDensity(indexB)
         end do    
       end do
-      simulations(:)%freeenergy = 1.d0/ simulations(:)%freeenergy
-!      freeenergyMin = minval(simulations(:)%freeenergy)
-!      simulations(:)%freeenergy = simulations(:)%freeenergy / freeenergyMin
+      freeenergy = 1.d0 / freeenergy
 
-      if(iIteration == 100)then
-        write(87,'(E15.4)')unbiasedDensity
-      end if
-      
-      unbiasedDensityRMSD = 0.d0
-      do indexB = 1, NumB
-        unbiasedDensityRMSD = unbiasedDensityRMSD + (unbiasedDensity(indexB)-unbiasedDensityOld(indexB))**2
-      end do
-      unbiasedDensityRMSD = sqrt(unbiasedDensityRMSD/NumB)
-
+      unbiasedDensityRMSD = rmsd(NumB, unbiasedDensity, unbiasedDensityOld)
       write(6,'(A,1X,I4,A,E12.4)')'Iteration ', iIteration, ': RMSD of unbiased density:', unbiasedDensityRMSD
 
       if( unbiasedDensityRMSD < TOLERANCE ) converged = .true.
       if( converged ) then
-        write(99,'(F10.4)')-kB*T_target*log(unbiasedDensity)
+        logUnbiasedDensity = - kB * T_target * log(unbiasedDensity)
+        logUnbiasedDensity = logUnbiasedDensity - minval(logUnbiasedDensity)
+        write(99,'(2F10.4)')(reactCoordBin(indexB, 1)%binRC, logUnbiasedDensity(indexB), indexB = 1, NumB)
         exit
       end if
       if ( iIteration == MAXITS ) then

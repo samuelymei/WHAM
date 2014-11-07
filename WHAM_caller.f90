@@ -5,8 +5,8 @@ program WHAM_caller
   character(len=60) :: datafile
   fid = 10
   read*,datafile
-  open(10, file = datafile)
+  open(fid, file = datafile)
   call startWHAM(fid)
   call finalizeWHAM
-  close(10)
+  close(fid)
 end program WHAM_caller

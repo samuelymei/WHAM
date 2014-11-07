@@ -10,7 +10,6 @@ module simulation
     real(kind=fp_kind) :: beta  ! inverse temperature of this simulation
     integer(kind=4) :: nSnapshots ! Number of snapshots in this simulation
     integer(kind=4) :: nEffectivenSnapshots ! snapshots outside the RC bins are removed
-    real(kind=fp_kind) :: freeEnergy
     type ( snapshot_info ), pointer :: snapshots(:) ! point to the snapshots
     type ( bin_info ), pointer :: bins(:)
   end type simulation_info
@@ -21,13 +20,15 @@ module simulation
 contains
 
   subroutine readSimulationInfo(fid)
-    use constant
+    use constant, only : kB
     implicit none
     integer(kind=4), intent(in) :: fid
+    real(kind=fp_kind) :: simulationTemperature
     integer(kind=4) :: indexW, indexS
     allocate(simulations(nSimulation))
     do indexW = 1, nSimulation
-      read(fid, *) simulations(indexW)%beta, simulations(indexW)%nSnapshots
+      read(fid, *) simulationTemperature, simulations(indexW)%nSnapshots
+      simulations(indexW)%beta = 1.d0 / ( kB * simulationTemperature )
       write(6,'(A,I3,A,F10.6,A,I10)') ' Simulation ', indexW, ':    beta = ', simulations(indexW)%beta, &
          & ', Number of snapshots:', simulations(indexW)%nSnapshots
       allocate(simulations(indexW)%snapshots(simulations(indexW)%nSnapshots))
@@ -61,7 +62,7 @@ contains
            & energyMax = simulations(indexW)%snapshots(indexS)%energyUnbiased
       end do
     end do
-    write(6,'(A,G12.3,A,G12.3)')'Energy range: ', energyMin, '~', energyMax
+    write(6,'(A,G12.5,A,G12.5)')'Energy range: ', energyMin, '~', energyMax
   end subroutine energyMinMax
 
   subroutine initBins(NumRCbin, NumEbin, NumBin, T_target)
@@ -69,19 +70,18 @@ contains
     implicit none
     integer(kind=4), intent(in) :: NumRCbin, NumEbin
     integer(kind=4), intent(out) :: NumBin
-    real(kind=fp_kind) :: T_target
+    real(kind=fp_kind), intent(in) :: T_target
 
     real(kind=fp_kind) :: energy(NumEbin)
-    real(kind=fp_kind) :: deltaRC, deltaE
+    real(kind=fp_kind) :: deltaE
     integer(kind=4) :: indexRCbin, indexEbin
-    real(kind=fp_kind) :: DELTA 
+    real(kind=fp_kind) :: delta 
     integer(kind=4) :: indexW, indexB
     real(kind=fp_kind) :: beta_target
-    real(kind=fp_kind) :: beta
     real(kind=fp_kind) :: biasingPotential
 
-    DELTA = (energyMax - energyMin)/(100*NumEbin)
-    deltaE = (energyMax - energyMin + DELTA)/NumEbin
+    delta = (energyMax - energyMin)/(100*NumEbin)
+    deltaE = (energyMax - energyMin + delta)/NumEbin
     do indexEbin = 1, NumEbin
       energy(indexEbin) = energyMin + deltaE * (indexEbin-0.5)
     end do
@@ -94,7 +94,8 @@ contains
     end do
 
     beta_target = 1.d0 / (kB*T_target)
-    write(6,*) 'Beta of the target temperature:', beta_target
+    write(6,'(A,F10.6)') 'Beta of the target temperature:', beta_target
+
     indexB = 0
     do indexRCbin = 1, NumRCbin
       do indexEbin = 1, NumEbin
