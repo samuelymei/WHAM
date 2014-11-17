@@ -66,7 +66,6 @@ contains
     use constant, only : kB
     implicit none
     real(kind=fp_kind) :: numerator(NumB), denominator(NumB)
-    real(kind=fp_kind) :: freeenergyMin
     real(kind=fp_kind) :: unbiasedDensityRMSD
     real(kind=fp_kind) :: unbiasedDensityOld(NumB)
     real(kind=fp_kind) :: sumOfUnbiasedDensity
