@@ -19,7 +19,7 @@ module WHAM
   integer(kind=4), public :: NumJ  ! number of reaction coordinate bins
   integer(kind=4), public :: NumK  ! number of energy bins
   integer(kind=4), public :: NumB  ! number of bins
-  real(kind=fp_kind) :: tolerance = 1.0D-5  ! convergence criterion for free energy 
+  real(kind=fp_kind) :: tolerance = 1.0D-4  ! convergence criterion for free energy 
   integer(kind=4), parameter :: MaxITS = 10000          ! max number of iterations
   real(kind=fp_kind), public :: T_target = 3.0D2      ! target temperature
 
